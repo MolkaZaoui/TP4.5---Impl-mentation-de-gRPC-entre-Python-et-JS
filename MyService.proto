@@ -1,0 +1,46 @@
+const grpc = require('grpc');
+const protoLoader = require('@grpc/proto-loader');
+const mysql = require('mysql');
+
+// Charger le fichier proto
+const packageDefinition = protoLoader.loadSync('service.proto');
+const myservice = grpc.loadPackageDefinition(packageDefinition).myservice;
+
+// Paramètres de connexion à adapter selon votre base de données
+const connection = mysql.createConnection({
+    host: 'localhost',
+    user: 'votre_utilisateur',
+    password: 'votre_mot_de_passe',
+    database: 'votre_base_de_donnees'
+});
+
+// Établir la connexion à la base de données
+connection.connect((err) => {
+    if (err) throw err;
+    console.log('Connecté à la base de données');
+});
+
+// Implémentation de la méthode getRecord
+function getRecord(call, callback) {
+    const id = call.request.id;
+    // Requête à la base de données pour obtenir le record avec l'ID spécifié
+    connection.query('SELECT * FROM records WHERE id = ?', [id], (error, results) => {
+        if (error) {
+            console.error(error);
+            callback(error);
+            return;
+        }
+        // Renvoyer les données au client
+        const record = results[0];
+        callback(null, { record: record });
+    });
+}
+
+// Création du serveur gRPC
+const server = new grpc.Server();
+server.addService(myservice.MyService.service, { getRecord: getRecord });
+
+// Démarrer le serveur sur le port de votre choix
+server.bind('127.0.0.1:50051', grpc.ServerCredentials.createInsecure());
+console.log('Serveur gRPC démarré sur le port 50051');
+server.start();
